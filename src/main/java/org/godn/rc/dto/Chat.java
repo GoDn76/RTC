@@ -1,4 +1,4 @@
-package org.godn.rc.model;
+package org.godn.rc.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,6 +13,7 @@ import java.util.Set;
 public class Chat {
     private String id;
     private String userId;
+    private String roomId;
     private String name;
     private String message;
     private Set<String> upvotes = new HashSet<>();
