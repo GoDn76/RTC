@@ -6,6 +6,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Repository;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,33 +38,51 @@ public class RedisChatStore {
         newChat.setRoomId(roomId);
         newChat.setName(name);
         newChat.setMessage(message);
+        newChat.setTimestamp(System.currentTimeMillis());
 
         try {
             String chatJson = objectMapper.writeValueAsString(newChat);
-            redisTemplate.opsForHash().put("room:"+roomId, newChat.getId(), chatJson);
+
+            String key = "room:" + roomId + ":chats";
+
+            // score = timestamp
+            redisTemplate.opsForZSet().add(
+                    key,
+                    chatJson,
+                    newChat.getTimestamp()
+            );
+
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to serialize chat", e);
         }
+
         return newChat;
     }
 
     public List<Chat> getChat(String roomId, int limit, int offset) {
-        List<Object> rawChats = redisTemplate.opsForHash().values("room:" + roomId);
+
+        String key = "room:" + roomId + ":chats";
+
+        Set<String> rawChats = redisTemplate.opsForZSet()
+                .reverseRange(key, offset, offset + limit - 1);
+
+        if (rawChats == null || rawChats.isEmpty()) {
+            return Collections.emptyList();
+        }
+
         List<Chat> parsedChats = new ArrayList<>();
 
-        for(Object rawChat : rawChats){
+        for (String rawChat : rawChats) {
             try {
-                parsedChats.add(objectMapper.readValue(rawChat.toString(), Chat.class));
+                parsedChats.add(
+                        objectMapper.readValue(rawChat, Chat.class)
+                );
             } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
+                throw new RuntimeException("Failed to deserialize chat", e);
             }
         }
 
-        return parsedChats.stream()
-                .sorted(Comparator.comparing(Chat::getTimestamp).reversed())
-                .skip(offset)
-                .limit(limit)
-                .collect(Collectors.toList());
+        return parsedChats;
     }
 
     public Chat upvotes(String userId, String roomId, String chatId){
@@ -99,8 +118,12 @@ public class RedisChatStore {
     }
 
     public Long getMemberCount(String roomId) {
-        return redisTemplate.opsForValue().get("room:" + roomId + ":count") != null ? Long.parseLong(Objects.requireNonNull(redisTemplate.opsForValue().get("room:" + roomId + ":count"))) : 0L;
+        String value = redisTemplate.opsForValue()
+                .get("room:" + roomId + ":count");
+
+        return value != null ? Long.parseLong(value) : 0L;
     }
+
     public void deleteRoom(String roomId) {
         redisTemplate.delete("room:" + roomId + ":metadata");
         redisTemplate.delete("room:" + roomId);
@@ -110,5 +133,16 @@ public class RedisChatStore {
 
     public boolean roomExists(String roomId) {
         return redisTemplate.hasKey("room:" + roomId + ":metadata");
+    }
+
+    private static final Duration ROOM_TTL = Duration.ofHours(2);
+
+    public void refreshRoomTTL(String roomId) {
+
+        String metaKey = "room:" + roomId + ":meta";
+        String chatKey = "room:" + roomId + ":chats";
+
+        redisTemplate.expire(metaKey, ROOM_TTL);
+        redisTemplate.expire(chatKey, ROOM_TTL);
     }
 }

@@ -128,7 +128,7 @@ public class MessageRouter {
 
         OutgoingMessage outgoing = new OutgoingMessage(actionType, chat);
         String jsonToSend = objectMapper.writeValueAsString(outgoing);
-        redisTemplate.convertAndSend("chatRoom", jsonToSend);
+        redisTemplate.convertAndSend("chatRoom:" + chat.getRoomId(), jsonToSend);
 
     }
 }

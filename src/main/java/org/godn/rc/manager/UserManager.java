@@ -10,7 +10,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
 
 @Slf4j
 @Component
@@ -26,13 +25,24 @@ public class UserManager {
     }
 
     public void addUser(String roomId, String userId, String name, WebSocketSession session) {
+
         if (roomId == null || roomId.trim().isEmpty() || !redisChatStore.roomExists(roomId)) {
             throw new InvalidParameterException("Room ID is not Valid, Empty or does not Exists.");
         }
 
-        roomSessions.computeIfAbsent(roomId, k -> new CopyOnWriteArraySet<>()).add(session);
-        sessionToRoom.put(session.getId(), roomId);
-        redisChatStore.incrementMemberCount(roomId);
+        Set<WebSocketSession> sessions =
+                roomSessions.computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet());
+
+        boolean added = sessions.add(session);
+
+        if (added) {
+            sessionToRoom.put(session.getId(), roomId);
+
+            redisChatStore.incrementMemberCount(roomId);
+
+            // 🔥 Refresh TTL (room active)
+            redisChatStore.refreshRoomTTL(roomId);
+        }
 
         log.info("User {} ({}) added to room: {}", name, userId, roomId);
     }

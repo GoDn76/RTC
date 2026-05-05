@@ -66,10 +66,10 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         String name = (payload.getName() != null) ? payload.getName().trim() : "Anonymous";
         String roomId = (payload.getRoomId() != null) ? payload.getRoomId().trim() : "";
 
-        String userId = (String) session.getAttributes().get("SECURE_USER_ID");
+        String userId = (String) session.getAttributes().get("USER_ID");
         if (userId == null) {
             userId = UUID.randomUUID().toString();
-            session.getAttributes().put("SECURE_USER_ID", userId);
+            session.getAttributes().put("USER_ID", userId);
         }
         payload.setUserId(userId);
 
@@ -106,7 +106,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         try {
             JsonNode rootNode = objectMapper.readTree(message.getPayload());
             JsonNode payloadNode = rootNode.path("payload");
-            log.info(rootNode.toString());
             String roomId = payloadNode.path("roomId").asText(null);
             String senderUserId = payloadNode.path("userId").asText(null);
 
@@ -120,6 +119,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                         webSocketSession.sendMessage(message);
                     }
                 }
+
             } else {
                 log.error("Broadcast failed: Could not find roomId in Redis message.");
             }

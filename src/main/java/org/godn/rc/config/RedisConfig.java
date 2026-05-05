@@ -22,7 +22,7 @@ public class RedisConfig {
                                                    MessageListenerAdapter listenerAdapter) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory); // Auto-injected from application.properties!
-        container.addMessageListener(listenerAdapter, new PatternTopic("chatRoom"));
+        container.addMessageListener(listenerAdapter, new PatternTopic("chatRoom:*"));
         return container;
     }
 
