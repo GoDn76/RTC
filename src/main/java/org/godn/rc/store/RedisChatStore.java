@@ -1,120 +1,80 @@
 package org.godn.rc.store;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.godn.rc.dto.Chat;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Repository;
 
-import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Repository
 public class RedisChatStore {
+
     private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RedisChatStore(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
 
+    /* =====================================================
+       ROOM MANAGEMENT
+    ===================================================== */
+
     public void initializeRoom(String roomId, String creatorName) {
-        String key = "room:" + roomId + ":metadata";
+
+        String metadataKey = "room:" + roomId + ":metadata";
 
         Map<String, String> metadata = new HashMap<>();
         metadata.put("creator", creatorName);
         metadata.put("createdAt", String.valueOf(System.currentTimeMillis()));
 
-        redisTemplate.opsForHash().putAll(key, metadata);
-
+        redisTemplate.opsForHash().putAll(metadataKey, metadata);
         redisTemplate.opsForSet().add("all_active_rooms", roomId);
     }
 
-    public Chat addChat(String userId, String name, String roomId, String message) {
-        Chat newChat = new Chat();
-        newChat.setId(UUID.randomUUID().toString());
-        newChat.setUserId(userId);
-        newChat.setRoomId(roomId);
-        newChat.setName(name);
-        newChat.setMessage(message);
-        newChat.setTimestamp(System.currentTimeMillis());
-
-        try {
-            String chatJson = objectMapper.writeValueAsString(newChat);
-
-            String key = "room:" + roomId + ":chats";
-
-            // score = timestamp
-            redisTemplate.opsForZSet().add(
-                    key,
-                    chatJson,
-                    newChat.getTimestamp()
-            );
-
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize chat", e);
-        }
-
-        return newChat;
+    public boolean roomExists(String roomId) {
+        return Boolean.TRUE.equals(
+                redisTemplate.hasKey("room:" + roomId + ":metadata")
+        );
     }
 
-    public List<Chat> getChat(String roomId, int limit, int offset) {
+    public void deleteRoom(String roomId) {
 
-        String key = "room:" + roomId + ":chats";
+        String messagesIndexKey = "room:" + roomId + ":messages";
 
-        Set<String> rawChats = redisTemplate.opsForZSet()
-                .reverseRange(key, offset, offset + limit - 1);
+        Set<String> messageIds =
+                redisTemplate.opsForZSet().range(messagesIndexKey, 0, -1);
 
-        if (rawChats == null || rawChats.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<Chat> parsedChats = new ArrayList<>();
-
-        for (String rawChat : rawChats) {
-            try {
-                parsedChats.add(
-                        objectMapper.readValue(rawChat, Chat.class)
-                );
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException("Failed to deserialize chat", e);
+        if (messageIds != null) {
+            for (String messageId : messageIds) {
+                redisTemplate.delete("room:" + roomId + ":message:" + messageId);
+                redisTemplate.delete("room:" + roomId + ":message:" + messageId + ":upvotes");
             }
         }
 
-        return parsedChats;
+        redisTemplate.delete("room:" + roomId + ":metadata");
+        redisTemplate.delete(messagesIndexKey);
+        redisTemplate.delete("room:" + roomId + ":count");
+
+        redisTemplate.opsForSet().remove("all_active_rooms", roomId);
     }
 
-    public Chat upvotes(String userId, String roomId, String chatId){
-        Object result = redisTemplate.opsForHash().get("room:" + roomId, chatId);
-
-        if(result == null){ return null; }
-
-        try {
-            Chat chat = objectMapper.readValue(result.toString(), Chat.class);
-
-            boolean isUniqueUpVote = chat.getUpvotes().add(userId);
-
-            if(isUniqueUpVote){
-                String updatedJson = objectMapper.writeValueAsString(chat);
-                redisTemplate.opsForHash().put("room:"+roomId, chatId, updatedJson);
-            }
-            return chat;
-        } catch (JsonProcessingException e){
-            e.printStackTrace();
-            return null;
-        }
-    }
-    public Set<String> getAllActiveRooms() {
-        return redisTemplate.opsForSet().members("all_active_rooms");
-    }
+    /* =====================================================
+       MEMBER COUNT (ROOM LIFECYCLE CONTROL)
+    ===================================================== */
 
     public void incrementMemberCount(String roomId) {
         redisTemplate.opsForValue().increment("room:" + roomId + ":count");
     }
 
     public void decrementMemberCount(String roomId) {
-        redisTemplate.opsForValue().decrement("room:" + roomId + ":count");
+
+        String key = "room:" + roomId + ":count";
+
+        Long remaining = redisTemplate.opsForValue().decrement(key);
+
+        if (remaining == null || remaining <= 0) {
+            deleteRoom(roomId);
+        }
     }
 
     public Long getMemberCount(String roomId) {
@@ -124,25 +84,95 @@ public class RedisChatStore {
         return value != null ? Long.parseLong(value) : 0L;
     }
 
-    public void deleteRoom(String roomId) {
-        redisTemplate.delete("room:" + roomId + ":metadata");
-        redisTemplate.delete("room:" + roomId);
-        redisTemplate.opsForValue().getOperations().delete("room:" + roomId + ":count");
-        redisTemplate.opsForSet().remove("all_active_rooms", roomId);
+    /* =====================================================
+       MESSAGE STORAGE (IMMUTABLE DESIGN)
+    ===================================================== */
+
+    public Chat addChat(String userId, String name, String roomId, String message) {
+
+        String chatId = UUID.randomUUID().toString();
+        long timestamp = System.currentTimeMillis();
+
+        Chat chat = new Chat();
+        chat.setId(chatId);
+        chat.setUserId(userId);
+        chat.setRoomId(roomId);
+        chat.setName(name);
+        chat.setMessage(message);
+        chat.setTimestamp(timestamp);
+
+        String messageKey = "room:" + roomId + ":message:" + chatId;
+        String messagesIndexKey = "room:" + roomId + ":messages";
+
+        Map<String, String> chatMap = new HashMap<>();
+        chatMap.put("id", chatId);
+        chatMap.put("userId", userId);
+        chatMap.put("roomId", roomId);
+        chatMap.put("name", name);
+        chatMap.put("message", message);
+        chatMap.put("timestamp", String.valueOf(timestamp));
+
+        redisTemplate.opsForHash().putAll(messageKey, chatMap);
+        redisTemplate.opsForZSet().add(messagesIndexKey, chatId, timestamp);
+
+        return chat;
     }
 
-    public boolean roomExists(String roomId) {
-        return redisTemplate.hasKey("room:" + roomId + ":metadata");
+    public List<Chat> getChats(String roomId, int limit, int offset) {
+
+        String messagesIndexKey = "room:" + roomId + ":messages";
+
+        Set<String> chatIds = redisTemplate.opsForZSet()
+                .reverseRange(messagesIndexKey, offset, offset + limit - 1);
+
+        if (chatIds == null || chatIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Chat> chats = new ArrayList<>();
+
+        for (String chatId : chatIds) {
+
+            String messageKey = "room:" + roomId + ":message:" + chatId;
+
+            Map<Object, Object> data = redisTemplate.opsForHash().entries(messageKey);
+            if (data.isEmpty()) continue;
+
+            Chat chat = new Chat();
+            chat.setId((String) data.get("id"));
+            chat.setUserId((String) data.get("userId"));
+            chat.setRoomId((String) data.get("roomId"));
+            chat.setName((String) data.get("name"));
+            chat.setMessage((String) data.get("message"));
+            chat.setTimestamp(Long.parseLong((String) data.get("timestamp")));
+
+            chat.setUpvotes(getUpvoteCount(roomId, chatId));
+
+            chats.add(chat);
+        }
+
+        return chats;
     }
 
-    private static final Duration ROOM_TTL = Duration.ofHours(2);
+    /* =====================================================
+       UPVOTES (ATOMIC & DISTRIBUTED SAFE)
+    ===================================================== */
 
-    public void refreshRoomTTL(String roomId) {
+    public long upvote(String userId, String roomId, String chatId) {
 
-        String metaKey = "room:" + roomId + ":meta";
-        String chatKey = "room:" + roomId + ":chats";
+        String upvoteKey = "room:" + roomId + ":message:" + chatId + ":upvotes";
 
-        redisTemplate.expire(metaKey, ROOM_TTL);
-        redisTemplate.expire(chatKey, ROOM_TTL);
+        redisTemplate.opsForSet().add(upvoteKey, userId);
+
+        return getUpvoteCount(roomId, chatId);
+    }
+
+    public long getUpvoteCount(String roomId, String chatId) {
+
+        String upvoteKey = "room:" + roomId + ":message:" + chatId + ":upvotes";
+
+        Long size = redisTemplate.opsForSet().size(upvoteKey);
+
+        return size != null ? size : 0;
     }
 }

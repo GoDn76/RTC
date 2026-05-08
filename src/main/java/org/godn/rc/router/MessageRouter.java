@@ -67,7 +67,7 @@ public class MessageRouter {
         int limit = payload.getLimit() != null ? payload.getLimit() : 50;
         int offset = payload.getOffset() != null ? payload.getOffset() : 0;
 
-        List<Chat> history = redisChatStore.getChat(payload.getRoomId(), limit, offset);
+        List<Chat> history = redisChatStore.getChats(payload.getRoomId(), limit, offset);
 
         OutgoingMessage response = new OutgoingMessage(OutgoingType.HISTORY, history);
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(response)));
@@ -75,7 +75,6 @@ public class MessageRouter {
 
     private void handleJoin(WebSocketSession session, IncomingPayload payload) throws Exception {
         String roomId = payload.getRoomId();
-        String userId = payload.getUserId();
 
         Long memberCount = redisChatStore.getMemberCount(roomId);
 
@@ -113,15 +112,18 @@ public class MessageRouter {
 
     private void handleUpvote(IncomingPayload payload) throws Exception {
 
-        Chat resultingChat = redisChatStore.upvotes(
+        long updatedCount = redisChatStore.upvote(
                 payload.getUserId(),
                 payload.getRoomId(),
                 payload.getChatId()
         );
 
-        if (resultingChat != null) {
-            publishToRedis(OutgoingType.UPDATE_CHAT, resultingChat);
-        }
+        Chat updatedChat = new Chat();
+        updatedChat.setId(payload.getChatId());
+        updatedChat.setRoomId(payload.getRoomId());
+        updatedChat.setUpvotes(updatedCount);
+
+        publishToRedis(OutgoingType.UPDATE_CHAT, updatedChat);
     }
 
     private void publishToRedis(OutgoingType actionType, Chat chat) throws Exception {

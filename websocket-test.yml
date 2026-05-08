@@ -1,0 +1,38 @@
+config:
+  target: "ws://localhost:9000"
+  phases:
+    - duration: 60
+      arrivalRate: 50
+  engines:
+    ws: {}
+
+scenarios:
+  - engine: ws
+    flow:
+      # Generate once per virtual user
+      - set:
+          name: "User{{ $randomNumber(1000, 999999) }}"
+
+      - connect:
+          url: "/hello"
+
+      - send:
+          text: |
+            {
+              "action": "JOIN",
+              "name": "{{ name }}",
+              "roomId": "TCF-JKX"
+            }
+
+      - think: 2
+
+      - send:
+          text: |
+            {
+              "action": "CHAT",
+              "name": "{{ name }}",
+              "roomId": "TCF-JKX",
+              "message": "Hello from {{ name }}"
+            }
+
+      - think: 10

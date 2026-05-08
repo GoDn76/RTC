@@ -5,5 +5,6 @@ public enum IncomingAction {
     CHAT,
     UPVOTE,
     CREATE_ROOM,
-    JOIN
+    JOIN,
+    JOIN_CHAT
 }

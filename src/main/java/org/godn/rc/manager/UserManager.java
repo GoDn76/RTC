@@ -1,5 +1,6 @@
 package org.godn.rc.manager;
 
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.godn.rc.store.RedisChatStore;
 import org.springframework.stereotype.Component;
@@ -40,8 +41,6 @@ public class UserManager {
 
             redisChatStore.incrementMemberCount(roomId);
 
-            // 🔥 Refresh TTL (room active)
-            redisChatStore.refreshRoomTTL(roomId);
         }
 
         log.info("User {} ({}) added to room: {}", name, userId, roomId);
@@ -77,5 +76,23 @@ public class UserManager {
 
     public boolean isUserInRoom(String id) {
         return sessionToRoom.containsKey(id);
+    }
+
+    @PreDestroy
+    public void cleanupOnShutdown() {
+        for (Map.Entry<String, Set<WebSocketSession>> entry : roomSessions.entrySet()) {
+
+            String roomId = entry.getKey();
+            Set<WebSocketSession> sessions = entry.getValue();
+
+            int size = sessions.size();
+
+            for (int i = 0; i < size; i++) {
+                redisChatStore.decrementMemberCount(roomId);
+            }
+        }
+
+        roomSessions.clear();
+        sessionToRoom.clear();
     }
 }

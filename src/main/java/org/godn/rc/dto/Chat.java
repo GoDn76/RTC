@@ -5,7 +5,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.HashSet;
-import java.util.Set;
 
 @Data
 @AllArgsConstructor
@@ -16,6 +15,6 @@ public class Chat {
     private String roomId;
     private String name;
     private String message;
-    private Set<String> upvotes = new HashSet<>();
+    private Long upvotes;
     private Long timestamp = System.currentTimeMillis();
 }
