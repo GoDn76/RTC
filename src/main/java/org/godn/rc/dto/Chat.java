@@ -3,9 +3,6 @@ package org.godn.rc.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.HashSet;
-
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
+import org.godn.rc.auth.exception.UnauthorizedException;
 import org.godn.rc.dto.IncomingAction;
 import org.godn.rc.dto.IncomingPayload;
 import org.godn.rc.dto.OutgoingMessage;
@@ -19,6 +20,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.io.IOException;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -49,7 +51,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session,
-                                     TextMessage message) {
+                                     TextMessage message) throws IOException {
 
         IncomingPayload payload;
 
@@ -89,8 +91,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 (String) session.getAttributes().get("USER_ID");
 
         if (userId == null) {
-            userId = UUID.randomUUID().toString();
-            session.getAttributes().put("USER_ID", userId);
+            session.close(CloseStatus.NOT_ACCEPTABLE);
+            return;
         }
 
         payload.setUserId(userId);
