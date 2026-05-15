@@ -15,9 +15,9 @@ public class PasswordResetTokenRepository {
         this.redisTemplate = redisTemplate;
     }
 
-    public void save(String token, String userId) {
+    public void save(String token, String userId, Long expirationInMinutes) {
         redisTemplate.opsForValue()
-                .set(PREFIX + userId, token, Duration.ofMinutes(15));
+                .set(PREFIX + userId, token, Duration.ofMinutes(expirationInMinutes));
     }
 
     public String getToken(String userId) {

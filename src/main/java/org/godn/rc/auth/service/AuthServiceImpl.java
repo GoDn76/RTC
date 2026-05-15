@@ -70,19 +70,7 @@ public class AuthServiceImpl implements AuthService {
     private void createAndSendVerificationOtp(User user) {
         String otp = generateOtp();
 
-        // Calculate Expiry: Current Time + 15 Minutes
-        Instant expiryTime = Instant.now().plus(OTP_EXPIRY_MINUTES, ChronoUnit.MINUTES);
-
-        // Fetch or Create token
-        VerificationToken verificationToken = verificationTokenRepository.findByUser(user)
-                .orElse(new VerificationToken());
-
-        // Set token details
-        verificationToken.setUser(user);
-        verificationToken.setToken(otp);
-        verificationToken.setExpiryDate(expiryTime);
-
-        verificationTokenRepository.save(verificationToken);
+        verificationTokenRepository.save(otp, user.getId().toString(), 15L);
 
         // NOTE: Ensure sendVerificationEmail is annotated with @Async in EmailService
         emailService.sendVerificationEmail(user.getEmail(), otp);
@@ -94,7 +82,7 @@ public class AuthServiceImpl implements AuthService {
     private void createAndSendPasswordResetOtp(User user) {
         String otp = generateOtp();
 
-        passwordResetTokenRepository.save(otp, user.getId().toString());
+        passwordResetTokenRepository.save(otp, user.getId().toString(), 15L);
 
         emailService.sendPasswordResetEmail(user.getEmail(), otp);
     }
@@ -153,23 +141,15 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(verificationDto.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", verificationDto.getEmail()));
 
-        VerificationToken token = verificationTokenRepository.findByUser(user)
-                .orElseThrow(() -> new BadRequestException("No verification token found for this user."));
+        String token = verificationTokenRepository.getToken(user.getId().toString());
 
-        // Check expiry first before validating OTP
-        if (token.getExpiryDate().isBefore(Instant.now())) {
-            verificationTokenRepository.delete(token);
-            throw new BadRequestException("OTP has expired. Please register again.");
-        }
-
-        if (!token.getToken().equals(verificationDto.getOtp())) {
+        if (token == null || !token.equals(verificationDto.getOtp())) {
             throw new BadRequestException("Invalid OTP.");
         }
 
         user.setEmailVerified(true);
         userRepository.save(user);
         verificationTokenRepository.delete(token);
-
         return new ApiResponseDto(true, "Email verified successfully.");
     }
 

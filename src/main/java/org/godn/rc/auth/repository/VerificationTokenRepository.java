@@ -1,19 +1,29 @@
 package org.godn.rc.auth.repository;
 
-import org.godn.rc.auth.model.User;
-import org.godn.rc.auth.model.VerificationToken;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
-import java.util.UUID;
-
+import java.time.Duration;
 @Repository
-public interface VerificationTokenRepository extends JpaRepository<VerificationToken, UUID> {
+public class VerificationTokenRepository {
+    private final StringRedisTemplate redisTemplate;
+    private static final String PREFIX = "verification_token:";
 
-    // A method to find a token by its string value
-    Optional<VerificationToken> findByToken(String token);
+    public VerificationTokenRepository(StringRedisTemplate redisTemplate) {
+        this.redisTemplate = redisTemplate;
+    }
 
-    // A method to find a token associated with a specific user
-    Optional<VerificationToken> findByUser(User user);
+    public void save(String token, String userId, Long expirationInMinutes) {
+        redisTemplate.opsForValue()
+                .set(PREFIX + userId, token, Duration.ofMinutes(expirationInMinutes));
+    }
+
+    public String getToken(String userId) {
+        return redisTemplate.opsForValue().get(PREFIX + userId);
+    }
+
+
+    public void delete(String userId) {
+        redisTemplate.delete(PREFIX + userId);
+    }
 }
