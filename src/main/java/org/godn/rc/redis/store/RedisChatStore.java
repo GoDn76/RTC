@@ -1,6 +1,6 @@
-package org.godn.rc.store;
+package org.godn.rc.redis.store;
 
-import org.godn.rc.dto.Chat;
+import org.godn.rc.websocket.dto.Chat;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 

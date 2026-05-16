@@ -149,7 +149,7 @@ public class AuthServiceImpl implements AuthService {
 
         user.setEmailVerified(true);
         userRepository.save(user);
-        verificationTokenRepository.delete(token);
+        verificationTokenRepository.delete(user.getId().toString());
         return new ApiResponseDto(true, "Email verified successfully.");
     }
 
@@ -262,7 +262,7 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
 
 
-        passwordResetTokenRepository.delete(resetDto.getOtp());
+        passwordResetTokenRepository.delete(user.getId().toString());
         return new ApiResponseDto(true, "Password reset successfully.");
     }
 

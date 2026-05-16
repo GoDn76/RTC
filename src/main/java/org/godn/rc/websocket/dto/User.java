@@ -1,4 +1,4 @@
-package org.godn.rc.dto;
+package org.godn.rc.websocket.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;

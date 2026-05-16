@@ -1,4 +1,4 @@
-package org.godn.rc.dto;
+package org.godn.rc.websocket.dto;
 
 public enum IncomingAction {
     GET_CHATS,

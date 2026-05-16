@@ -50,6 +50,11 @@ public class JwtTokenProvider {
         return claims.get("email").toString();
     }
 
+    public String getNameFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        return claims.get("name").toString();
+    }
+
     public String getUserIdFromToken(String token) {
         Claims claims = getClaimsFromToken(token);
         return claims.getSubject();

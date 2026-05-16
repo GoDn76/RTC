@@ -1,7 +1,7 @@
-package org.godn.rc.pubsub;
+package org.godn.rc.redis.pubsub;
 
 import lombok.extern.slf4j.Slf4j;
-import org.godn.rc.handlers.ChatWebSocketHandler; // Make sure this matches your package!
+import org.godn.rc.websocket.handlers.ChatWebSocketHandler; // Make sure this matches your package!
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;

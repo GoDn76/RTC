@@ -1,12 +1,11 @@
 package org.godn.rc.config;
 
-import org.godn.rc.Interceptor.JwtHandshakeInterceptor;
-import org.godn.rc.handlers.ChatWebSocketHandler;
+import org.godn.rc.websocket.Interceptor.JwtHandshakeInterceptor;
+import org.godn.rc.websocket.handlers.ChatWebSocketHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
-import org.springframework.web.socket.server.HandshakeInterceptor;
 
 @Configuration
 @EnableWebSocket

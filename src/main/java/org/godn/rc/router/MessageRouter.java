@@ -1,11 +1,11 @@
 package org.godn.rc.router;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.godn.rc.dto.Chat;
-import org.godn.rc.dto.IncomingPayload;
-import org.godn.rc.dto.OutgoingMessage;
-import org.godn.rc.dto.OutgoingType;
-import org.godn.rc.store.RedisChatStore;
+import org.godn.rc.websocket.dto.Chat;
+import org.godn.rc.websocket.dto.InternalPayload;
+import org.godn.rc.websocket.dto.OutgoingMessage;
+import org.godn.rc.websocket.dto.OutgoingType;
+import org.godn.rc.redis.store.RedisChatStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -31,7 +31,7 @@ public class MessageRouter {
         this.redisTemplate = redisTemplate;
     }
 
-    public void routeIncomingMessage(WebSocketSession session, IncomingPayload payload) throws Exception {
+    public void routeIncomingMessage(WebSocketSession session, InternalPayload payload) throws Exception {
 
         switch (payload.getAction()) {
             case JOIN:
@@ -54,7 +54,7 @@ public class MessageRouter {
         }
     }
 
-    private void handleCreateRoom(WebSocketSession session, IncomingPayload payload) throws Exception {
+    private void handleCreateRoom(WebSocketSession session, InternalPayload payload) throws Exception {
         Map<String, String> roomData = new HashMap<>();
         roomData.put("roomId", payload.getRoomId());
         roomData.put("userId", payload.getUserId());
@@ -63,7 +63,7 @@ public class MessageRouter {
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(outMsg)));
     }
 
-    private void handleGetChats(WebSocketSession session, IncomingPayload payload) throws Exception {
+    private void handleGetChats(WebSocketSession session, InternalPayload payload) throws Exception {
         int limit = payload.getLimit() != null ? payload.getLimit() : 50;
         int offset = payload.getOffset() != null ? payload.getOffset() : 0;
 
@@ -73,7 +73,7 @@ public class MessageRouter {
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(response)));
     }
 
-    private void handleJoin(WebSocketSession session, IncomingPayload payload) throws Exception {
+    private void handleJoin(WebSocketSession session, InternalPayload payload) throws Exception {
         String roomId = payload.getRoomId();
 
         Long memberCount = redisChatStore.getMemberCount(roomId);
@@ -98,7 +98,7 @@ public class MessageRouter {
         publishToRedis(OutgoingType.ADD_CHAT, systemAlert);
     }
 
-    private void handleNewChat(IncomingPayload payload) throws Exception {
+    private void handleNewChat(InternalPayload payload) throws Exception {
         // Save to Database
         Chat resultingChat = redisChatStore.addChat(
                 payload.getUserId(),
@@ -110,7 +110,7 @@ public class MessageRouter {
         publishToRedis(OutgoingType.ADD_CHAT, resultingChat);
     }
 
-    private void handleUpvote(IncomingPayload payload) throws Exception {
+    private void handleUpvote(InternalPayload payload) throws Exception {
 
         long updatedCount = redisChatStore.upvote(
                 payload.getUserId(),

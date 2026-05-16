@@ -1,6 +1,6 @@
 package org.godn.rc.config;
 
-import org.godn.rc.pubsub.RedisSubscriber;
+import org.godn.rc.redis.pubsub.RedisSubscriber;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;

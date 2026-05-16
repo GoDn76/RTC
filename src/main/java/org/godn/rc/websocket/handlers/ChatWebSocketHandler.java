@@ -1,15 +1,11 @@
-package org.godn.rc.handlers;
+package org.godn.rc.websocket.handlers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
-import org.godn.rc.auth.exception.UnauthorizedException;
-import org.godn.rc.dto.IncomingAction;
-import org.godn.rc.dto.IncomingPayload;
-import org.godn.rc.dto.OutgoingMessage;
-import org.godn.rc.dto.OutgoingType;
-import org.godn.rc.manager.UserManager;
+import org.godn.rc.websocket.dto.*;
+import org.godn.rc.websocket.manager.UserManager;
 import org.godn.rc.router.MessageRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,9 +17,8 @@ import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorato
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
-import java.util.Random;
+import java.security.SecureRandom;
 import java.util.Set;
-import java.util.UUID;
 
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
@@ -53,11 +48,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     protected void handleTextMessage(WebSocketSession session,
                                      TextMessage message) throws IOException {
 
-        IncomingPayload payload;
+        IncomingPayload incomingPayload;
 
         // ---------------- JSON Parsing ----------------
         try {
-            payload = objectMapper.readValue(
+            incomingPayload = objectMapper.readValue(
                     message.getPayload(),
                     IncomingPayload.class
             );
@@ -69,7 +64,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
         // ---------------- Validation ----------------
         Set<ConstraintViolation<IncomingPayload>> violations =
-                validator.validate(payload);
+                validator.validate(incomingPayload);
 
         if (!violations.isEmpty()) {
             sendError(session,
@@ -77,21 +72,32 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        IncomingAction action = payload.getAction();
-        String name = payload.getName() != null
-                ? payload.getName().trim()
-                : "Anonymous";
+        InternalPayload payload = new InternalPayload();
+        payload.setRoomId(incomingPayload.getRoomId());
+        payload.setAction(incomingPayload.getAction());
+        payload.setMessage(incomingPayload.getMessage());
+        payload.setChatId(incomingPayload.getChatId());
+        payload.setLimit(incomingPayload.getLimit());
+        payload.setOffset(incomingPayload.getOffset());
 
-        String roomId = payload.getRoomId() != null
-                ? payload.getRoomId().trim()
-                : "";
+        IncomingAction action = payload.getAction();
+
+        String name = (String) session.getAttributes().get("name");
+        if (name == null) {
+            session.close(CloseStatus.POLICY_VIOLATION);
+            return;
+        }
+
+        String roomId = payload.getRoomId();
+        if (roomId == null) {
+            session.close(CloseStatus.POLICY_VIOLATION);
+            return;
+        }
 
         // ---------------- Identity Setup ----------------
-        String userId =
-                (String) session.getAttributes().get("USER_ID");
-
+        String userId = (String) session.getAttributes().get("USER_ID");
         if (userId == null) {
-            session.close(CloseStatus.NOT_ACCEPTABLE);
+            session.close(CloseStatus.POLICY_VIOLATION);
             return;
         }
 
@@ -129,7 +135,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             }
 
             // -------- JOIN ROOM IF NOT PRESENT --------
-            if (!userManager.isUserInRoom(session.getId())) {
+            if (!userManager.isUserInRoom(roomId, userId)) {
 
                 WebSocketSession safeSession =
                         new ConcurrentWebSocketSessionDecorator(
@@ -149,8 +155,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             sendError(session, "Internal server error.");
         }
     }
-
-    // ================= THREAD SAFE BROADCAST =================
 
     public void broadcastToLocalUsers(TextMessage message) {
 
@@ -221,7 +225,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
         StringBuilder code = new StringBuilder();
-        Random rnd = new Random();
+        SecureRandom rnd = new SecureRandom();
 
         for (int i = 0; i < 6; i++) {
             code.append(chars.charAt(

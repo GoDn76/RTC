@@ -3,12 +3,17 @@ package org.godn.rc.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.godn.rc.auth.model.User;
 
-import java.awt.*;
 import java.time.Instant;
 import java.util.UUID;
 
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 @Entity
 @Table(name = "messages", indexes = {@Index(name = "idx_chatroom_created", columnList = "chat_room_id, createdAt")})
 public class Message {

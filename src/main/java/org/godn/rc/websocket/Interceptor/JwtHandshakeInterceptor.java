@@ -1,4 +1,4 @@
-package org.godn.rc.Interceptor;
+package org.godn.rc.websocket.Interceptor;
 
 import org.godn.rc.auth.security.JwtTokenProvider;
 import org.jspecify.annotations.Nullable;
@@ -36,6 +36,8 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
             }
 
             String userId = jwtTokenProvider.getUserIdFromToken(token);
+            String name = jwtTokenProvider.getNameFromToken(token);
+            attributes.put("name", name);
             attributes.put("USER_ID", userId);
         }
 

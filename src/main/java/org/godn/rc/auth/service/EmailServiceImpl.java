@@ -40,6 +40,7 @@ public class EmailServiceImpl implements EmailService {
      * Sends an email with a 6-digit password reset OTP.
      */
     @Override
+    @Async
     public void sendPasswordResetEmail(String to, String token) {
         String subject = appName + " - Password Reset Request";
 

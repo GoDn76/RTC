@@ -1,10 +1,17 @@
 package org.godn.rc.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 @Entity
 @Table(name = "chat_rooms")
 public class ChatRoom {
@@ -20,7 +27,7 @@ public class ChatRoom {
     private Instant createdAt = Instant.now();
 
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL)
-    private List<ChatParticipant> participants;
+    private List<ChatParticipants> participants;
 
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL)
     private List<Message> messages;
