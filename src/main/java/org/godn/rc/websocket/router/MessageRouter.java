@@ -1,6 +1,7 @@
-package org.godn.rc.router;
+package org.godn.rc.websocket.router;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.godn.rc.entity.ChatRoomType;
 import org.godn.rc.websocket.dto.Chat;
 import org.godn.rc.websocket.dto.InternalPayload;
 import org.godn.rc.websocket.dto.OutgoingMessage;
@@ -13,10 +14,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.security.SecureRandom;
+import java.util.*;
 
 @Component
 public class MessageRouter {
@@ -34,13 +33,10 @@ public class MessageRouter {
     public void routeIncomingMessage(WebSocketSession session, InternalPayload payload) throws Exception {
 
         switch (payload.getAction()) {
-            case JOIN:
-                handleJoin(session, payload);
-                break;
             case GET_CHATS:
                 handleGetChats(session, payload);
                 break;
-            case CHAT:
+            case CHAT, DIRECT_MESSAGE:
                 handleNewChat(payload);
                 break;
             case UPVOTE:
@@ -54,11 +50,33 @@ public class MessageRouter {
         }
     }
 
+    public String registerDMRoom (String user1, String user2) {
+        List<String> users = List.of(user1, user2);
+        List<String> sorted = new ArrayList<>(users);
+        Collections.sort(sorted);
+
+        String dmKey = "dm:"+sorted.get(0) + ":" + sorted.get(1);
+
+        String roomId = redisTemplate.opsForValue().get(dmKey);
+
+        if(roomId != null) {
+            return roomId;
+        }
+
+        roomId = generateRoomCode();
+
+        redisTemplate.opsForValue().set(dmKey, roomId);
+
+        redisChatStore.initializeRoom(roomId, "SYSTEM", "SYSTEM", ChatRoomType.PRIVATE);
+
+        return roomId;
+    }
+
     private void handleCreateRoom(WebSocketSession session, InternalPayload payload) throws Exception {
         Map<String, String> roomData = new HashMap<>();
         roomData.put("roomId", payload.getRoomId());
         roomData.put("userId", payload.getUserId());
-        redisChatStore.initializeRoom(payload.getRoomId(), payload.getName());
+        redisChatStore.initializeRoom(payload.getRoomId(), payload.getName(), payload.getUserId(), payload.getRoomType());
         OutgoingMessage outMsg = new OutgoingMessage(OutgoingType.ROOM_CREATED, roomData);
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(outMsg)));
     }
@@ -73,41 +91,17 @@ public class MessageRouter {
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(response)));
     }
 
-    private void handleJoin(WebSocketSession session, InternalPayload payload) throws Exception {
-        String roomId = payload.getRoomId();
-
-        Long memberCount = redisChatStore.getMemberCount(roomId);
-
-        Map<String, Object> joinData = new HashMap<>();
-        joinData.put("roomId", roomId);
-        joinData.put("memberCount", memberCount);
-        joinData.put("message", "Successfully joined room " + roomId);
-
-        OutgoingMessage joinSuccess = new OutgoingMessage(OutgoingType.JOIN_SUCCESS, joinData);
-        session.sendMessage(new TextMessage(objectMapper.writeValueAsString(joinSuccess)));
-
-        handleGetChats(session, payload);
-
-        Chat systemAlert = new Chat();
-        systemAlert.setId(UUID.randomUUID().toString());
-        systemAlert.setRoomId(roomId);
-        systemAlert.setMessage("A new user "+payload.getName()+" has joined the room! Say hi!");
-        systemAlert.setName("System");
-        systemAlert.setUserId("SYSTEM");
-
-        publishToRedis(OutgoingType.ADD_CHAT, systemAlert);
-    }
-
     private void handleNewChat(InternalPayload payload) throws Exception {
-        // Save to Database
-        Chat resultingChat = redisChatStore.addChat(
-                payload.getUserId(),
-                payload.getName(),
-                payload.getRoomId(),
-                payload.getMessage()
-        );
+        if(!payload.getMessage().isEmpty()) {
+            Chat resultingChat = redisChatStore.addChat(
+                    payload.getUserId(),
+                    payload.getName(),
+                    payload.getRoomId(),
+                    payload.getMessage()
+            );
 
-        publishToRedis(OutgoingType.ADD_CHAT, resultingChat);
+            publishToRedis(OutgoingType.ADD_CHAT, resultingChat);
+        }
     }
 
     private void handleUpvote(InternalPayload payload) throws Exception {
@@ -132,5 +126,21 @@ public class MessageRouter {
         String jsonToSend = objectMapper.writeValueAsString(outgoing);
         redisTemplate.convertAndSend("chatRoom:" + chat.getRoomId(), jsonToSend);
 
+    }
+
+    private String generateRoomCode() {
+        String chars =
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+        StringBuilder code = new StringBuilder();
+        SecureRandom rnd = new SecureRandom();
+
+        for (int i = 0; i < 6; i++) {
+            code.append(chars.charAt(
+                    rnd.nextInt(chars.length())));
+        }
+
+        return code.substring(0, 3) + "-" +
+                code.substring(3);
     }
 }

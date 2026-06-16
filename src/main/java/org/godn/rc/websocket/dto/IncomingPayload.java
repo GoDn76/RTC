@@ -1,5 +1,6 @@
 package org.godn.rc.websocket.dto;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -15,6 +16,7 @@ public class IncomingPayload {
             message = "Invalid Room ID format. Must be like 4W1-RM2.")
     private String roomId;
 
+    private String targetUserId;
     private String message;
     private String chatId;
 

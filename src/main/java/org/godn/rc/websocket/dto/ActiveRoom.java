@@ -3,6 +3,7 @@ package org.godn.rc.websocket.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.godn.rc.entity.ChatRoomType;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,5 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @AllArgsConstructor
 public class ActiveRoom {
     private String roomId;
-    private Set<User> users = ConcurrentHashMap.newKeySet();
+    private ChatRoomType roomType;
+    private Set<ChatUser> users = ConcurrentHashMap.newKeySet();
 }

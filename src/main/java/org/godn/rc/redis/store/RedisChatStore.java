@@ -1,5 +1,6 @@
 package org.godn.rc.redis.store;
 
+import org.godn.rc.entity.ChatRoomType;
 import org.godn.rc.websocket.dto.Chat;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
@@ -19,17 +20,21 @@ public class RedisChatStore {
        ROOM MANAGEMENT
     ===================================================== */
 
-    public void initializeRoom(String roomId, String creatorName) {
+    public void initializeRoom(String roomId, String creatorName, String creatorId, ChatRoomType roomType) {
 
         String metadataKey = "room:" + roomId + ":metadata";
 
         Map<String, String> metadata = new HashMap<>();
+        metadata.put("roomId", roomId);
         metadata.put("creator", creatorName);
+        metadata.put("creatorId", creatorId);
         metadata.put("createdAt", String.valueOf(System.currentTimeMillis()));
+        metadata.put("roomType", roomType.name());
 
         redisTemplate.opsForHash().putAll(metadataKey, metadata);
         redisTemplate.opsForSet().add("all_active_rooms", roomId);
     }
+
 
     public boolean roomExists(String roomId) {
         return Boolean.TRUE.equals(
@@ -38,6 +43,12 @@ public class RedisChatStore {
     }
 
     public void deleteRoom(String roomId) {
+
+        Set<String> members = getMembers(roomId);
+
+        for (String userId : members) {
+            removeReverseMembership(roomId, userId);
+        }
 
         String messagesIndexKey = "room:" + roomId + ":messages";
 
@@ -54,6 +65,7 @@ public class RedisChatStore {
         redisTemplate.delete("room:" + roomId + ":metadata");
         redisTemplate.delete(messagesIndexKey);
         redisTemplate.delete("room:" + roomId + ":count");
+        redisTemplate.delete("room:" + roomId + ":members");
 
         redisTemplate.opsForSet().remove("all_active_rooms", roomId);
     }
@@ -62,11 +74,11 @@ public class RedisChatStore {
        MEMBER COUNT (ROOM LIFECYCLE CONTROL)
     ===================================================== */
 
-    public void incrementMemberCount(String roomId) {
+    public void incrementActiveCount(String roomId) {
         redisTemplate.opsForValue().increment("room:" + roomId + ":count");
     }
 
-    public void decrementMemberCount(String roomId) {
+    public void decrementActiveCount(String roomId) {
 
         String key = "room:" + roomId + ":count";
 
@@ -77,7 +89,7 @@ public class RedisChatStore {
         }
     }
 
-    public Long getMemberCount(String roomId) {
+    public Long getActiveCount(String roomId) {
         String value = redisTemplate.opsForValue()
                 .get("room:" + roomId + ":count");
 
@@ -174,5 +186,74 @@ public class RedisChatStore {
         Long size = redisTemplate.opsForSet().size(upvoteKey);
 
         return size != null ? size : 0;
+    }
+
+    public void addMembership(String roomId, String userId) {
+        String membershipKey = "room:" + roomId + ":members";
+        String revMembershipKey = "user:" + userId + ":rooms";
+        redisTemplate.opsForSet().add(membershipKey, userId);
+        redisTemplate.opsForSet().add(revMembershipKey, roomId);
+    }
+
+    public void removeMembership(String roomId, String userId) {
+        String membershipKey = "room:" + roomId + ":members";
+
+        redisTemplate.opsForSet().remove(membershipKey, userId);
+
+    }
+
+    private void removeReverseMembership(String roomId, String userId) {
+        String revMembershipKey = "user:" + userId + ":rooms";
+        redisTemplate.opsForSet().remove(revMembershipKey, roomId);
+    }
+
+
+    public boolean isMember(String roomId, String userId) {
+        String membershipKey = "room:" + roomId + ":members";
+        return redisTemplate.opsForSet().isMember(membershipKey, userId);
+    }
+
+    public Set<String> getMembers(String roomId) {
+        String membershipKey = "room:" + roomId + ":members";
+        Set<String> members =
+                redisTemplate.opsForSet().members(membershipKey);
+
+        return members != null ? members : Collections.emptySet();
+    }
+
+
+    public long getMemberCount(String roomId) {
+        String membershipKey = "room:" + roomId + ":members";
+
+        Long size = redisTemplate.opsForSet().size(membershipKey);
+
+        return size != null ? size : 0;
+    }
+    public Set<String> getUserRooms(String userId) {
+
+        String key = "user:" + userId + ":rooms";
+
+        Set<String> rooms =
+                redisTemplate.opsForSet().members(key);
+
+        return rooms != null
+                ? rooms
+                : Collections.emptySet();
+    }
+
+
+    public void markUserOnline(String userId) {
+        redisTemplate.opsForValue()
+                .set("online:user:" + userId, "true");
+    }
+
+    public void markUserOffline(String userId) {
+        redisTemplate.delete("online:user:" + userId);
+    }
+
+    public boolean isUserOnline(String userId) {
+        return Boolean.TRUE.equals(
+                redisTemplate.hasKey("online:user:" + userId)
+        );
     }
 }

@@ -43,6 +43,7 @@ public class ProfileServiceImpl implements  ProfileService {
         dto.setEmailVerified(user.getEmailVerified());
         return dto;
     }
+
     @Override
     public User getUserByEmail(String email) {
         return userRepository.findByEmail(email)

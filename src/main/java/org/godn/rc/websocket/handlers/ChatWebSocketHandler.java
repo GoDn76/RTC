@@ -4,9 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
+import org.godn.rc.entity.ChatRoomType;
 import org.godn.rc.websocket.dto.*;
 import org.godn.rc.websocket.manager.UserManager;
-import org.godn.rc.router.MessageRouter;
+import org.godn.rc.websocket.router.MessageRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -42,6 +43,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         log.info("User Connected: {}", session.getId());
+        String userId = (String)session.getAttributes().get("USER_ID");
+        String name = (String)session.getAttributes().get("name");
+        userManager.markActive(userId, name, session);
     }
 
     @Override
@@ -88,11 +92,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        String roomId = payload.getRoomId();
-        if (roomId == null) {
-            session.close(CloseStatus.POLICY_VIOLATION);
-            return;
-        }
+        String roomId = payload.getRoomId() != null
+                ? payload.getRoomId().trim()
+                : "";
 
         // ---------------- Identity Setup ----------------
         String userId = (String) session.getAttributes().get("USER_ID");
@@ -103,35 +105,66 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
         payload.setUserId(userId);
 
+
         try {
 
             // -------- CREATE ROOM --------
             if (roomId.isEmpty()) {
 
-                if (action == IncomingAction.CREATE_ROOM) {
-
-                    roomId = generateRoomCode();
-                    payload.setRoomId(roomId);
-
-                    // Route first (initialize Redis room)
-                    messageRouter.routeIncomingMessage(session, payload);
-
-                    // Wrap session safely
-                    WebSocketSession safeSession =
-                            new ConcurrentWebSocketSessionDecorator(
-                                    session,
-                                    5000,
-                                    1024 * 1024
-                            );
-
-                    userManager.addUser(roomId, userId, name, safeSession);
-                    return;
-
-                } else {
-                    sendError(session,
-                            "Room ID is required for this action.");
+                if (action != IncomingAction.CREATE_ROOM) {
+                    sendError(session, "Room ID is required for this action.");
                     return;
                 }
+
+                // -------- GROUP --------
+                if (payload.getRoomType() == ChatRoomType.GROUP) {
+
+                    roomId = generateRoomCode();
+
+                    payload.setRoomId(roomId);
+
+                    messageRouter.routeIncomingMessage(session, payload);
+
+                    userManager.addUserToRoom(roomId, userId);
+
+                    return;
+                }
+
+                // -------- DM --------
+                if (payload.getRoomType() == ChatRoomType.PRIVATE) {
+
+                    String targetUserId =
+                            incomingPayload.getTargetUserId();
+
+                    ChatUser target =
+                            userManager.getUser(targetUserId);
+
+                    if (target == null) {
+
+                        sendError(session, "User not found");
+
+                        return;
+                    }
+
+                    roomId = messageRouter.registerDMRoom(
+                            userId,
+                            targetUserId
+                    );
+
+                    payload.setRoomId(roomId);
+
+                    messageRouter.routeIncomingMessage(session, payload);
+
+                    userManager.addUserToRoom(roomId, userId);
+
+                    userManager.addUserToRoom(roomId, targetUserId);
+
+                    return;
+                }
+
+                sendError(session, "Invalid room type.");
+
+                return;
             }
 
             // -------- JOIN ROOM IF NOT PRESENT --------
@@ -210,12 +243,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                                       CloseStatus status) {
         log.info("User Disconnected: {}", session.getId());
 
-        try {
-            userManager.removeUser(session);
-        } catch (Exception e) {
-            log.error("Error during user removal: {}",
-                    e.getMessage());
-        }
+        String userId = (String)session.getAttributes().get("USER_ID");
+        userManager.markOffline(userId, session);
     }
 
     // ================= HELPERS =================

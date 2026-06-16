@@ -4,6 +4,8 @@ import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.godn.rc.entity.ChatRoomType;
+import org.hibernate.validator.constraints.UUID;
 
 @Data
 @AllArgsConstructor
@@ -21,6 +23,9 @@ public class InternalPayload {
             message = "Invalid Room ID format. Must be like 4W1-RM2.")
     private String roomId;
 
+    @UUID
+    private String targetUserId;
+    private ChatRoomType roomType;
     private String message;
     private String chatId;
 

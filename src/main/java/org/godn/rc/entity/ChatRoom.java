@@ -1,6 +1,8 @@
 package org.godn.rc.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -23,6 +25,14 @@ public class ChatRoom {
     private ChatRoomType type;
 
     private String name;
+
+    @NotBlank(message = "Join ID is required")
+    @Pattern(
+            regexp = "^[A-Z0-9]{3}-[A-Z0-9]{3}$",
+            message = "Join ID must be 6 uppercase letters or digits."
+    )
+    @Column(unique = true, nullable = false, length = 6)
+    private String joinId;
 
     private Instant createdAt = Instant.now();
 

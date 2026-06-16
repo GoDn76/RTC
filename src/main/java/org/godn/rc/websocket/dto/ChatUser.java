@@ -12,9 +12,11 @@ import java.util.UUID;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class User {
+public class ChatUser {
     private UUID id;
     private String name;
+
+    private String email;
     // CRITICAL: Prevents Spring from crashing if you send this object over a WebSocket
     @JsonIgnore
     private WebSocketSession session;
@@ -25,7 +27,7 @@ public class User {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        User chatUser = (User) o;
+        ChatUser chatUser = (ChatUser) o;
         return Objects.equals(id, chatUser.id);
     }
 

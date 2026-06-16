@@ -2,7 +2,10 @@ package org.godn.rc.websocket.manager;
 
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.godn.rc.auth.payload.UserProfileDto;
+import org.godn.rc.auth.service.ProfileService;
 import org.godn.rc.redis.store.RedisChatStore;
+import org.godn.rc.websocket.dto.ChatUser;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -10,6 +13,7 @@ import java.security.InvalidParameterException;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -24,10 +28,16 @@ public class UserManager {
     private final Map<String, SessionMeta> sessionIndex =
             new ConcurrentHashMap<>();
 
-    private final RedisChatStore redisChatStore;
+    // userId -> sessions
+    private final Map<String, Set<WebSocketSession>> userSessions =
+            new ConcurrentHashMap<>();
 
-    public UserManager(RedisChatStore redisChatStore) {
+    private final RedisChatStore redisChatStore;
+    private final ProfileService profileService;
+
+    public UserManager(RedisChatStore redisChatStore,  ProfileService profileService) {
         this.redisChatStore = redisChatStore;
+        this.profileService = profileService;
     }
 
     public void addUser(String roomId,
@@ -51,11 +61,23 @@ public class UserManager {
         boolean firstSessionForUser = sessions.isEmpty();
         sessions.add(session);
 
-        sessionIndex.put(session.getId(), new SessionMeta(roomId, userId));
+        userSessions.putIfAbsent(userId, ConcurrentHashMap.newKeySet());
+        userSessions.get(userId).add(session);
+
+        sessionIndex.compute(session.getId(), (id, meta) -> {
+
+            if (meta == null) {
+                meta = new SessionMeta(userId);
+            }
+
+            meta.roomIds.add(roomId);
+
+            return meta;
+        });
 
         // 🔥 Increment member count ONLY if this is first session for that user
         if (firstSessionForUser) {
-            redisChatStore.incrementMemberCount(roomId);
+            redisChatStore.incrementActiveCount(roomId);
             log.info("User {} ({}) joined room {}", name, userId, roomId);
         } else {
             log.info("User {} ({}) opened additional session in room {}", name, userId, roomId);
@@ -74,44 +96,50 @@ public class UserManager {
 
         return allSessions;
     }
+    public void disconnectSession(WebSocketSession session) {
 
-    public void removeUser(WebSocketSession session) {
-
-        String sessionId = session.getId();
-        SessionMeta meta = sessionIndex.remove(sessionId);
+        SessionMeta meta = sessionIndex.remove(session.getId());
 
         if (meta == null) return;
 
-        String roomId = meta.roomId;
         String userId = meta.userId;
 
-        Map<String, Set<WebSocketSession>> userMap =
-                roomUserSessions.get(roomId);
+        Set<WebSocketSession> sessionsForUser = userSessions.get(userId);
 
-        if (userMap == null) return;
+        if (sessionsForUser != null) {
 
-        Set<WebSocketSession> sessions = userMap.get(userId);
+            sessionsForUser.remove(session);
 
-        if (sessions != null) {
-            sessions.remove(session);
-
-            // 🔥 If no more sessions for that user → decrement member count
-            if (sessions.isEmpty()) {
-                userMap.remove(userId);
-                redisChatStore.decrementMemberCount(roomId);
-
-                log.info("User {} left room {}", userId, roomId);
+            if (sessionsForUser.isEmpty()) {
+                userSessions.remove(userId);
             }
         }
 
-        // Cleanup room if empty
-        if (userMap.isEmpty()) {
-            roomUserSessions.remove(roomId);
+        for (String roomId : meta.roomIds) {
 
-            try {
-                redisChatStore.deleteRoom(roomId);
-            } catch (Exception e) {
-                log.error("Failed deleting room {}: {}", roomId, e.getMessage());
+            Map<String, Set<WebSocketSession>> userMap =
+                    roomUserSessions.get(roomId);
+
+            if (userMap == null) continue;
+
+            Set<WebSocketSession> sessions = userMap.get(userId);
+
+            if (sessions != null) {
+
+                sessions.remove(session);
+
+                if (sessions.isEmpty()) {
+
+                    userMap.remove(userId);
+
+                    redisChatStore.decrementActiveCount(roomId);
+
+                    log.info("User {} left room {}", userId, roomId);
+                }
+            }
+
+            if (userMap.isEmpty()) {
+                roomUserSessions.remove(roomId);
             }
         }
     }
@@ -124,12 +152,97 @@ public class UserManager {
         return userMap != null && userMap.containsKey(userId);
     }
 
+    public ChatUser getUser (String userId) {
+        UserProfileDto user = profileService.getUserProfile(userId);
+        if (user == null) return null;
+        ChatUser newUser = new ChatUser();
+        newUser.setEmail(user.getEmail());
+        newUser.setName(user.getName());
+        newUser.setId(UUID.fromString(userId));
+
+        return newUser;
+    }
+
+    public void markActive(String userId,
+                           String name,
+                           WebSocketSession session) {
+
+        redisChatStore.markUserOnline(userId);
+
+        for (String roomId : redisChatStore.getUserRooms(userId)) {
+
+            try {
+                addUser(roomId, userId, name, session);
+            } catch (Exception e) {
+                log.error("Failed adding from room {}: {}",
+                        roomId,
+                        e.getMessage());
+            }
+        }
+    }
+
+    public void markOffline(String userId,
+                            WebSocketSession session) {
+
+        redisChatStore.markUserOffline(userId);
+
+        disconnectSession(session);
+    }
+
+    public void addUserToRoom(String roomId,
+                              String userId) {
+
+        // Already a member? Nothing to do.
+        if (redisChatStore.isMember(roomId, userId)) {
+            return;
+        }
+
+        // Persist membership
+        redisChatStore.addMembership(roomId, userId);
+
+        // User offline? Membership is enough.
+        if (!isOnline(userId)) {
+            return;
+        }
+
+        ChatUser user = getUser(userId);
+
+        if (user == null) {
+            log.warn("User {} not found while adding to room {}", userId, roomId);
+            return;
+        }
+
+        // Attach all active sessions
+        for (WebSocketSession session : getSessionsForUser(userId)) {
+
+            try {
+                addUser(
+                        roomId,
+                        userId,
+                        user.getName(),
+                        session
+                );
+            } catch (Exception e) {
+                log.error(
+                        "Failed attaching user {} to room {}: {}",
+                        userId,
+                        roomId,
+                        e.getMessage()
+                );
+            }
+        }
+    }
+
+    public boolean isOnline (String userId) {
+        return redisChatStore.isUserOnline(userId);
+    }
+
     @PreDestroy
     public void cleanupOnShutdown() {
         roomUserSessions.forEach((roomId, userMap) -> {
             int userCount = userMap.size();
             for (int i = 0; i < userCount; i++) {
-                redisChatStore.decrementMemberCount(roomId);
+                redisChatStore.decrementActiveCount(roomId);
             }
         });
 
@@ -138,12 +251,20 @@ public class UserManager {
     }
 
     private static class SessionMeta {
-        String roomId;
         String userId;
+        Set<String> roomIds;
 
-        SessionMeta(String roomId, String userId) {
-            this.roomId = roomId;
+        SessionMeta(String userId) {
             this.userId = userId;
+            this.roomIds = ConcurrentHashMap.newKeySet();
         }
+    }
+
+    public Set<WebSocketSession> getSessionsForUser(String userId) {
+
+        return userSessions.getOrDefault(
+                userId,
+                Collections.emptySet()
+        );
     }
 }
