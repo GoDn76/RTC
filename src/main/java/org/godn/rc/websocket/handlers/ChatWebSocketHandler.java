@@ -48,13 +48,13 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         userManager.markActive(userId, name, session);
     }
 
+
     @Override
     protected void handleTextMessage(WebSocketSession session,
                                      TextMessage message) throws IOException {
 
         IncomingPayload incomingPayload;
 
-        // ---------------- JSON Parsing ----------------
         try {
             incomingPayload = objectMapper.readValue(
                     message.getPayload(),
@@ -66,7 +66,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        // ---------------- Validation ----------------
         Set<ConstraintViolation<IncomingPayload>> violations =
                 validator.validate(incomingPayload);
 
@@ -76,73 +75,109 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
+        String userId =
+                (String) session.getAttributes().get("USER_ID");
+
+        String name =
+                (String) session.getAttributes().get("name");
+
+        if (userId == null || name == null) {
+            session.close(CloseStatus.POLICY_VIOLATION);
+            return;
+        }
+
         InternalPayload payload = new InternalPayload();
-        payload.setRoomId(incomingPayload.getRoomId());
+
         payload.setAction(incomingPayload.getAction());
         payload.setMessage(incomingPayload.getMessage());
         payload.setChatId(incomingPayload.getChatId());
         payload.setLimit(incomingPayload.getLimit());
         payload.setOffset(incomingPayload.getOffset());
 
-        IncomingAction action = payload.getAction();
-
-        String name = (String) session.getAttributes().get("name");
-        if (name == null) {
-            session.close(CloseStatus.POLICY_VIOLATION);
-            return;
-        }
-
-        String roomId = payload.getRoomId() != null
-                ? payload.getRoomId().trim()
-                : "";
-
-        // ---------------- Identity Setup ----------------
-        String userId = (String) session.getAttributes().get("USER_ID");
-        if (userId == null) {
-            session.close(CloseStatus.POLICY_VIOLATION);
-            return;
-        }
-
         payload.setUserId(userId);
+        payload.setName(name);
 
+        String targetUserId =
+                incomingPayload.getTargetUserId();
+
+        String roomId =
+                incomingPayload.getRoomId() == null
+                        ? ""
+                        : incomingPayload.getRoomId().trim();
 
         try {
 
-            // -------- CREATE ROOM --------
-            if (roomId.isEmpty()) {
+            // =====================================================
+            // CREATE ROOM
+            // =====================================================
+            if (payload.getAction() == IncomingAction.CREATE_ROOM) {
 
-                if (action != IncomingAction.CREATE_ROOM) {
-                    sendError(session, "Room ID is required for this action.");
-                    return;
-                }
-
-                // -------- GROUP --------
-                if (payload.getRoomType() == ChatRoomType.GROUP) {
-
-                    roomId = generateRoomCode();
-
-                    payload.setRoomId(roomId);
-
-                    messageRouter.routeIncomingMessage(session, payload);
-
-                    userManager.addUserToRoom(roomId, userId);
-
-                    return;
-                }
-
-                // -------- DM --------
-                if (payload.getRoomType() == ChatRoomType.PRIVATE) {
-
-                    String targetUserId =
-                            incomingPayload.getTargetUserId();
+                // ---------- DM ----------
+                if (targetUserId != null && !targetUserId.isBlank()) {
 
                     ChatUser target =
                             userManager.getUser(targetUserId);
 
                     if (target == null) {
-
                         sendError(session, "User not found");
+                        return;
+                    }
 
+                    payload.setRoomType(ChatRoomType.PRIVATE);
+
+                    roomId = messageRouter.registerDMRoom(
+                            userId,
+                            targetUserId
+                    );
+
+                    userManager.addUserToRoom(
+                            roomId,
+                            userId
+                    );
+
+                    userManager.addUserToRoom(
+                            roomId,
+                            targetUserId
+                    );
+                }
+
+                // ---------- GROUP ----------
+                else {
+
+                    payload.setRoomType(ChatRoomType.GROUP);
+
+                    roomId = generateRoomCode();
+
+                    userManager.addUserToRoom(
+                            roomId,
+                            userId
+                    );
+                }
+
+                payload.setRoomId(roomId);
+
+                messageRouter.routeIncomingMessage(
+                        session,
+                        payload
+                );
+
+                return;
+            }
+
+            // =====================================================
+            // CHAT + GET_CHATS
+            // =====================================================
+            if (payload.getAction() == IncomingAction.CHAT
+                    || payload.getAction() == IncomingAction.GET_CHATS) {
+
+                // ---------- DM ----------
+                if (targetUserId != null && !targetUserId.isBlank()) {
+
+                    ChatUser target =
+                            userManager.getUser(targetUserId);
+
+                    if (target == null) {
+                        sendError(session, "User not found");
                         return;
                     }
 
@@ -150,42 +185,55 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                             userId,
                             targetUserId
                     );
-
-                    payload.setRoomId(roomId);
-
-                    messageRouter.routeIncomingMessage(session, payload);
-
-                    userManager.addUserToRoom(roomId, userId);
-
-                    userManager.addUserToRoom(roomId, targetUserId);
-
-                    return;
                 }
 
-                sendError(session, "Invalid room type.");
+                // ---------- GROUP ----------
+                else {
+
+                    if (roomId.isBlank()) {
+
+                        sendError(
+                                session,
+                                "Room ID required."
+                        );
+
+                        return;
+                    }
+                }
+
+                payload.setRoomId(roomId);
+
+                messageRouter.routeIncomingMessage(
+                        session,
+                        payload
+                );
 
                 return;
             }
 
-            // -------- JOIN ROOM IF NOT PRESENT --------
-            if (!userManager.isUserInRoom(roomId, userId)) {
+            // =====================================================
+            // OTHER ACTIONS
+            // =====================================================
+            payload.setRoomId(roomId);
 
-                WebSocketSession safeSession =
-                        new ConcurrentWebSocketSessionDecorator(
-                                session,
-                                5000,
-                                1024 * 1024
-                        );
-
-                userManager.addUser(roomId, userId, name, safeSession);
-            }
-
-            messageRouter.routeIncomingMessage(session, payload);
+            messageRouter.routeIncomingMessage(
+                    session,
+                    payload
+            );
 
         } catch (Exception e) {
-            log.error("Action failed for user {}: {}",
-                    userId, e.getMessage());
-            sendError(session, "Internal server error.");
+
+            log.error(
+                    "Action failed for user {}: {}",
+                    userId,
+                    e.getMessage(),
+                    e
+            );
+
+            sendError(
+                    session,
+                    "Internal server error."
+            );
         }
     }
 

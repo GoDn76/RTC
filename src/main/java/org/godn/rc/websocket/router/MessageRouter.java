@@ -36,7 +36,7 @@ public class MessageRouter {
             case GET_CHATS:
                 handleGetChats(session, payload);
                 break;
-            case CHAT, DIRECT_MESSAGE:
+            case CHAT:
                 handleNewChat(payload);
                 break;
             case UPVOTE:
