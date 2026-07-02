@@ -11,6 +11,8 @@ import org.hibernate.validator.constraints.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class InternalPayload {
+    private String roomName;
+
     private IncomingAction action;
 
     private String name;

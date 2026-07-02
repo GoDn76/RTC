@@ -6,10 +6,12 @@ import org.godn.rc.auth.model.User;
 import org.godn.rc.auth.payload.UpdateProfileDto;
 import org.godn.rc.auth.payload.UserProfileDto;
 import org.godn.rc.auth.service.ProfileService;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -19,6 +21,14 @@ public class ProfileController {
 
     private final ProfileService profileService;
 
+    @GetMapping("/users")
+    public ResponseEntity<List<UserProfileDto>> getUsers(
+            @RequestParam String query,
+            Authentication authentication
+    ) {
+        String currUserEmail = authentication.getName();
+        return ResponseEntity.ok(profileService.getUsers(currUserEmail, query, Pageable.ofSize(10)));
+    }
     /**
      * Get the current authenticated user's profile.
      */

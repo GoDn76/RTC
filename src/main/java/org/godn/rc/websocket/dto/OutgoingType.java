@@ -5,5 +5,6 @@ public enum OutgoingType {
     UPDATE_CHAT,
     HISTORY,
     ROOM_CREATED,
-    JOIN_SUCCESS, ERROR
+    JOIN_SUCCESS, ERROR,
+    ROOMS
 }

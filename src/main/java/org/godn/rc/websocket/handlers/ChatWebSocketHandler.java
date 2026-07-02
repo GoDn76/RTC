@@ -14,7 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
-import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
@@ -86,6 +85,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
+        incomingPayload.setRoomName(incomingPayload.getRoomName());
+
         InternalPayload payload = new InternalPayload();
 
         payload.setAction(incomingPayload.getAction());
@@ -107,6 +108,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
         try {
 
+            if(payload.getAction() == IncomingAction.GET_ROOMS) {
+                messageRouter.routeIncomingMessage(
+                        session,
+                        payload
+                );
+                return;
+            }
+
             // =====================================================
             // CREATE ROOM
             // =====================================================
@@ -127,7 +136,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
                     roomId = messageRouter.registerDMRoom(
                             userId,
-                            targetUserId
+                            targetUserId,
+                            name,
+                            target.getName()
                     );
 
                     userManager.addUserToRoom(
@@ -153,7 +164,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                             userId
                     );
                 }
-
+                payload.setRoomName(incomingPayload.getRoomName());
                 payload.setRoomId(roomId);
 
                 messageRouter.routeIncomingMessage(
@@ -183,7 +194,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
                     roomId = messageRouter.registerDMRoom(
                             userId,
-                            targetUserId
+                            targetUserId,
+                            name,
+                            target.getName()
                     );
                 }
 

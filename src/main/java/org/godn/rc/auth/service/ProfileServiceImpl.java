@@ -4,10 +4,13 @@ import org.godn.rc.auth.model.User;
 import org.godn.rc.auth.payload.UpdateProfileDto;
 import org.godn.rc.auth.payload.UserProfileDto;
 import org.godn.rc.auth.repository.UserRepository;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ProfileServiceImpl implements  ProfileService {
@@ -38,6 +41,7 @@ public class ProfileServiceImpl implements  ProfileService {
 
     private UserProfileDto mapToDto(User user) {
         UserProfileDto dto = new UserProfileDto();
+        dto.setUuid(user.getId().toString());
         dto.setName(user.getName());
         dto.setEmail(user.getEmail());
         dto.setEmailVerified(user.getEmailVerified());
@@ -48,5 +52,17 @@ public class ProfileServiceImpl implements  ProfileService {
     public User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    @Override
+    public List<UserProfileDto> getUsers(String currUserEmail, String query, Pageable pageable) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+
+        return userRepository.searchUsers(currUserEmail, query.trim(), pageable)
+                .stream()
+                .map(this::mapToDto)
+                .toList();
     }
 }

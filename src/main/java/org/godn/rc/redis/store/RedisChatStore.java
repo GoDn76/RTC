@@ -2,6 +2,8 @@ package org.godn.rc.redis.store;
 
 import org.godn.rc.entity.ChatRoomType;
 import org.godn.rc.websocket.dto.Chat;
+import org.godn.rc.websocket.dto.InternalPayload;
+import org.godn.rc.websocket.dto.RoomInfoDto;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -20,21 +22,65 @@ public class RedisChatStore {
        ROOM MANAGEMENT
     ===================================================== */
 
-    public void initializeRoom(String roomId, String creatorName, String creatorId, ChatRoomType roomType) {
+    public void initializeRoom(InternalPayload payload) {
+
+        String metadataKey = "room:" + payload.getRoomId() + ":metadata";
+
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("roomName", payload.getRoomName());
+        metadata.put("roomId", payload.getRoomId());
+        metadata.put("creator", payload.getName());
+        metadata.put("creatorId", payload.getUserId());
+        metadata.put("createdAt", String.valueOf(System.currentTimeMillis()));
+        metadata.put("roomType", String.valueOf(payload.getRoomType()));
+
+        redisTemplate.opsForHash().putAll(metadataKey, metadata);
+        redisTemplate.opsForSet().add("all_active_rooms", payload.getRoomId());
+    }
+
+    public void initializeRoom(InternalPayload payload, String participant1Id, String participant2Id, String participant1Name, String participant2Name) {
+
+        initializeRoom(payload);
+
+        String metadataKey = "room:" + payload.getRoomId() + ":metadata";
+
+        Map<String, String> participants = new HashMap<>();
+        participants.put("participant1Id", participant1Id);
+        participants.put("participant1Name", participant1Name);
+        participants.put("participant2Id", participant2Id);
+        participants.put("participant2Name", participant2Name);
+
+        redisTemplate.opsForHash().putAll(metadataKey, participants);
+    }
+
+    private Map<Object, Object> getRoomMetadata(String roomId) {
 
         String metadataKey = "room:" + roomId + ":metadata";
 
-        Map<String, String> metadata = new HashMap<>();
-        metadata.put("roomId", roomId);
-        metadata.put("creator", creatorName);
-        metadata.put("creatorId", creatorId);
-        metadata.put("createdAt", String.valueOf(System.currentTimeMillis()));
-        metadata.put("roomType", roomType.name());
-
-        redisTemplate.opsForHash().putAll(metadataKey, metadata);
-        redisTemplate.opsForSet().add("all_active_rooms", roomId);
+        return redisTemplate.opsForHash()
+                .entries(metadataKey);
     }
 
+    public RoomInfoDto getRoomInfo(String roomId, String userId) {
+        Map<Object, Object> map = redisTemplate.opsForHash()
+                .entries("room:" + roomId + ":metadata");
+
+        if (map.isEmpty()) {
+            return null;
+        }
+        String displayName = userId.equals((String) map.get("participant1Id")) ? (String) map.get("participant2Name") : (String) map.get("participant1Name");
+        String targetUserId = userId.equals((String) map.get("participant1Id")) ? (String) map.get("participant2Id") : (String) map.get("participant1Id");
+        System.out.println((String) map.get("participant1Id"));
+        ChatRoomType roomType =
+                ChatRoomType.valueOf((String) map.get("roomType"));
+        return new RoomInfoDto(
+                (String) map.get("roomId"),
+                roomType,
+                (roomType.equals(ChatRoomType.GROUP) ? (String) map.get("roomName") : displayName),
+                (roomType.equals(ChatRoomType.PRIVATE) ? targetUserId : null),
+                null
+        );
+    }
 
     public boolean roomExists(String roomId) {
         return Boolean.TRUE.equals(
@@ -83,10 +129,10 @@ public class RedisChatStore {
         String key = "room:" + roomId + ":count";
 
         Long remaining = redisTemplate.opsForValue().decrement(key);
-
-        if (remaining == null || remaining <= 0) {
-            deleteRoom(roomId);
-        }
+//
+//        if (remaining == null || remaining <= 0) {
+//            deleteRoom(roomId);
+//        }
     }
 
     public Long getActiveCount(String roomId) {
@@ -229,6 +275,7 @@ public class RedisChatStore {
 
         return size != null ? size : 0;
     }
+
     public Set<String> getUserRooms(String userId) {
 
         String key = "user:" + userId + ":rooms";

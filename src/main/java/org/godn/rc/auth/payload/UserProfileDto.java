@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserProfileDto {
+    private String uuid;
     private String name;
     private String email;
     private boolean emailVerified;

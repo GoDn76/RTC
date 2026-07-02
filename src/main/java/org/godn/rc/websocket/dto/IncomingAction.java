@@ -6,5 +6,6 @@ public enum IncomingAction {
     UPVOTE,
     CREATE_ROOM,
     JOIN,
+    GET_ROOMS,
     DIRECT_MESSAGE
 }
