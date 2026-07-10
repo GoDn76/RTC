@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import type { ChatMessage } from '../types';
+import { saveMessageToCache, saveMessagesToCache, getMessagesFromCache } from '../lib/db';
 
 interface ChatState {
   messagesByRoom: Record<string, ChatMessage[]>;
   addMessage: (roomId: string, message: ChatMessage) => void;
   updateMessage: (roomId: string, messageId: string, updates: Partial<ChatMessage>) => void;
   setHistory: (roomId: string, messages: ChatMessage[]) => void;
+  loadHistoryFromCache: (roomId: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -13,8 +15,9 @@ export const useChatStore = create<ChatState>((set) => ({
   addMessage: (roomId, message) =>
     set((state) => {
       const roomMessages = state.messagesByRoom[roomId] || [];
-      // Prevent duplicates
       if (roomMessages.some((m) => m.id === message.id)) return state;
+      
+      saveMessageToCache(roomId, message);
       return {
         messagesByRoom: {
           ...state.messagesByRoom,
@@ -25,10 +28,18 @@ export const useChatStore = create<ChatState>((set) => ({
   updateMessage: (roomId, messageId, updates) =>
     set((state) => {
       const roomMessages = state.messagesByRoom[roomId] || [];
+      const updatedMessages = roomMessages.map((m) => {
+        if (m.id === messageId) {
+          const updated = { ...m, ...updates };
+          saveMessageToCache(roomId, updated);
+          return updated;
+        }
+        return m;
+      });
       return {
         messagesByRoom: {
           ...state.messagesByRoom,
-          [roomId]: roomMessages.map((m) => (m.id === messageId ? { ...m, ...updates } : m)),
+          [roomId]: updatedMessages,
         },
       };
     }),
@@ -37,13 +48,12 @@ export const useChatStore = create<ChatState>((set) => ({
       const existingMessages = state.messagesByRoom[roomId] || [];
       const messageMap = new Map();
       
-      // Add existing messages first
       existingMessages.forEach(m => messageMap.set(m.id, m));
-      // Add incoming history (overwriting duplicates with the newer data payload if any)
       messages.forEach(m => messageMap.set(m.id, m));
       
-      // Convert back to array and sort chronologically (oldest to newest)
       const merged = Array.from(messageMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+      
+      saveMessagesToCache(roomId, merged);
       
       return {
         messagesByRoom: {
@@ -52,4 +62,22 @@ export const useChatStore = create<ChatState>((set) => ({
         },
       };
     }),
+  loadHistoryFromCache: async (roomId: string) => {
+    const cached = await getMessagesFromCache(roomId);
+    if (cached && cached.length > 0) {
+      set((state) => {
+        const existingMessages = state.messagesByRoom[roomId] || [];
+        const messageMap = new Map();
+        cached.forEach(m => messageMap.set(m.id, m));
+        existingMessages.forEach(m => messageMap.set(m.id, m)); // in-memory wins if duplicate
+        const merged = Array.from(messageMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+        return {
+          messagesByRoom: {
+            ...state.messagesByRoom,
+            [roomId]: merged,
+          },
+        };
+      });
+    }
+  }
 }));

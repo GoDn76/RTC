@@ -79,11 +79,13 @@ export function ResetPassword() {
         className="w-full max-w-md relative z-10"
       >
         <div className="glass-panel p-8 sm:p-10 rounded-[2.5rem]">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold tracking-tight mb-3">Create New Password</h1>
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold tracking-tight mb-2 bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
+              Reset your password
+            </h1>
+            <p className="text-emerald-500 font-medium tracking-wide text-sm mb-2">ReChatOn Security</p>
             <p className="text-muted-foreground text-sm">
-              Enter the 6-digit code sent to <br/>
-              <span className="font-medium text-foreground">{forgotPasswordEmail}</span>
+              Enter the OTP sent to <span className="text-foreground font-medium">{forgotPasswordEmail}</span> and your new password
             </p>
           </div>
 

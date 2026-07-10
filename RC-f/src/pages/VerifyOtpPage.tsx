@@ -110,7 +110,8 @@ export function VerifyOtpPage() {
       >
         <div className="glass-panel p-8 sm:p-10 rounded-[2.5rem]">
           <div className="text-center mb-10">
-            <h1 className="text-3xl font-bold tracking-tight mb-3">Verify Email</h1>
+            <h1 className="text-3xl font-bold tracking-tight mb-3">Verify your email</h1>
+            <p className="text-emerald-500 font-medium tracking-wide text-sm mb-4">Welcome to ReChatOn</p>
             <p className="text-muted-foreground text-sm">
               We've sent a 6-digit code to <br/>
               <span className="text-foreground font-medium">{pendingVerificationEmail}</span>

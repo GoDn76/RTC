@@ -59,11 +59,12 @@ export function ForgotPassword() {
             Back to login
           </Link>
           
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight mb-3">Reset Password</h1>
-            <p className="text-muted-foreground text-sm">
-              Enter your email address and we'll send you an OTP to reset your password.
-            </p>
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold tracking-tight mb-2 bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
+              Reset your password
+            </h1>
+            <p className="text-emerald-500 font-medium tracking-wide text-sm mb-2">ReChatOn Security</p>
+            <p className="text-muted-foreground text-sm">Enter your email to receive a password reset code</p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">

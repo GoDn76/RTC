@@ -89,8 +89,9 @@ export function Register() {
         <div className="glass-panel p-8 sm:p-10 rounded-[2.5rem]">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold tracking-tight mb-2 bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
-              Create Account
+              Create your ReChatOn account
             </h1>
+            <p className="text-emerald-500 font-medium tracking-wide text-sm mb-2">Conversations. Instantly.</p>
             <p className="text-muted-foreground">Join the conversation today</p>
           </div>
 
