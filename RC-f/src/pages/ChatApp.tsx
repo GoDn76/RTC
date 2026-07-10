@@ -34,9 +34,17 @@ export function ChatApp() {
               or create a new room to begin chatting.
             </p>
             
-            <p className="text-xs font-medium text-emerald-500/70 uppercase tracking-widest">
+            <p className="text-xs font-medium text-emerald-500/70 uppercase tracking-widest mb-12">
               Your conversations will appear here instantly
             </p>
+            
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-500/80 text-xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+              </span>
+              Notice: The current backend is temporary. Chat history may be reset periodically.
+            </div>
           </div>
         </div>
       )}
