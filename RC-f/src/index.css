@@ -44,7 +44,7 @@
   }
 
   .dark {
-    --background: 155 12% 6%; /* Deep Charcoal / Green Tint */
+    --background: 153 15% 5%; /* #0B0F0D equivalent */
     --foreground: 0 0% 98%;
 
     --card: 155 12% 9%;
@@ -72,11 +72,11 @@
     --input: 0 0% 100%;
     --ring: 157 80% 43%;
 
-    /* Premium 3D Glass Dark */
-    --glass-bg: 155 15% 12% / 0.4;
+    /* Premium 3D Glass Dark - Enhanced Depth */
+    --glass-bg: 155 15% 12% / 0.45;
     --glass-border: 0 0% 100% / 0.08;
-    --glass-highlight: 0 0% 100% / 0.05;
-    --glass-shadow: 0 12px 40px -8px rgba(0,0,0,0.5);
+    --glass-highlight: 0 0% 100% / 0.06;
+    --glass-shadow: 0 16px 48px -12px rgba(0,0,0,0.6);
   }
 }
 
@@ -94,13 +94,13 @@
 @layer utilities {
   .glass {
     background: hsl(var(--glass-bg));
-    backdrop-filter: blur(24px);
+    backdrop-filter: blur(40px);
     border: 1px solid hsl(var(--glass-border));
   }
 
   .glass-3d {
     background: linear-gradient(135deg, hsl(var(--glass-bg)), transparent);
-    backdrop-filter: blur(24px);
+    backdrop-filter: blur(40px);
     border: 1px solid hsl(var(--glass-border));
     box-shadow: 
       inset 0 1px 1px hsl(var(--glass-highlight)),
@@ -109,11 +109,11 @@
 
   .glass-panel {
     background: hsl(var(--glass-bg));
-    backdrop-filter: blur(32px);
+    backdrop-filter: blur(48px);
     border: 1px solid hsl(var(--glass-border));
     box-shadow: 
       inset 0 1px 1px hsl(var(--glass-highlight)),
-      inset 0 0 60px hsl(var(--glass-highlight) / 0.1), 
+      inset 0 0 80px hsl(var(--glass-highlight) / 0.05), 
       hsl(var(--glass-shadow));
   }
   

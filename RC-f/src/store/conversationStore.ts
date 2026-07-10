@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Conversation } from '../types';
-import { saveRoomsToCache, saveRoomToCache, getRoomsFromCache, clearRoomsCache } from '../lib/db';
+import { syncRoomsToCache, saveRoomToCache, getRoomsFromCache, clearRoomsCache } from '../lib/db';
 
 interface ConversationState {
   conversations: Conversation[];
@@ -20,7 +20,7 @@ export const useConversationStore = create<ConversationState>((set) => ({
   isSidebarCollapsed: false,
   toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
   setConversations: (conversations) => {
-    saveRoomsToCache(conversations);
+    syncRoomsToCache(conversations);
     set({ conversations });
   },
   addConversation: (conversation) =>

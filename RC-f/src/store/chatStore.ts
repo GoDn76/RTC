@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ChatMessage } from '../types';
-import { saveMessageToCache, saveMessagesToCache, getMessagesFromCache } from '../lib/db';
+import { saveMessageToCache, syncMessagesToCache, getMessagesFromCache } from '../lib/db';
 
 interface ChatState {
   messagesByRoom: Record<string, ChatMessage[]>;
@@ -46,14 +46,23 @@ export const useChatStore = create<ChatState>((set) => ({
   setHistory: (roomId, messages) =>
     set((state) => {
       const existingMessages = state.messagesByRoom[roomId] || [];
-      const messageMap = new Map();
+      let newMessages = [...existingMessages];
       
-      existingMessages.forEach(m => messageMap.set(m.id, m));
-      messages.forEach(m => messageMap.set(m.id, m));
+      if (messages.length === 0) {
+        // Backend restart / wipe detection
+        newMessages = [];
+      } else {
+        // Safe Merge for paginated history
+        for (const msg of messages) {
+          const idx = newMessages.findIndex(m => m.id === msg.id);
+          if (idx !== -1) newMessages[idx] = msg;
+          else newMessages.push(msg);
+        }
+      }
       
-      const merged = Array.from(messageMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+      const merged = newMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
       
-      saveMessagesToCache(roomId, merged);
+      syncMessagesToCache(roomId, messages, true);
       
       return {
         messagesByRoom: {

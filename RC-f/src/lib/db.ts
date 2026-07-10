@@ -67,10 +67,23 @@ export const clearUserCache = async () => {
 };
 
 // -- Rooms --
-export const saveRoomsToCache = async (rooms: Conversation[]) => {
+export const syncRoomsToCache = async (serverRooms: Conversation[]) => {
   const db = await getDB();
   const tx = db.transaction('rooms', 'readwrite');
-  for (const room of rooms) {
+  
+  // Get all existing room IDs
+  const existingRooms = await tx.store.getAllKeys();
+  const serverIds = new Set(serverRooms.map(r => r.id));
+  
+  // Delete any room from cache that is NOT on the server
+  for (const id of existingRooms) {
+    if (!serverIds.has(id as string)) {
+      await tx.store.delete(id);
+    }
+  }
+  
+  // Update/Add server rooms
+  for (const room of serverRooms) {
     tx.store.put(room);
   }
   await tx.done;
@@ -92,10 +105,26 @@ export const clearRoomsCache = async () => {
 };
 
 // -- Messages --
-export const saveMessagesToCache = async (conversationId: string, messages: ChatMessage[]) => {
+export const syncMessagesToCache = async (conversationId: string, serverMessages: ChatMessage[], isInitialSync: boolean = false) => {
   const db = await getDB();
   const tx = db.transaction('messages', 'readwrite');
-  for (const msg of messages) {
+  const index = tx.store.index('by-conversation');
+  
+  if (isInitialSync) {
+    if (serverMessages.length === 0) {
+      // Backend returned empty history -> Assume Redis restart/data wipe.
+      // Clear all cached messages for this room.
+      const cachedMessages = await index.getAll(conversationId);
+      for (const msg of cachedMessages) {
+        await tx.store.delete(msg.id);
+      }
+    }
+    // If length > 0, we do not delete older cached messages because we assume 
+    // the backend may only be returning the latest paginated chunk.
+  }
+  
+  // Upsert the actual server messages (merging by ID happens implicitly via put with keyPath)
+  for (const msg of serverMessages) {
     tx.store.put({ ...msg, conversationId });
   }
   await tx.done;

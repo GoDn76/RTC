@@ -61,7 +61,12 @@ function PublicRoute() {
 }
 
 export default function App() {
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(() => {
+    // Synchronously check if a token exists in local storage (Zustand persist)
+    // If we have a token, we bypass the startup screen entirely so refreshes are instant
+    const hasToken = !!useAuthStore.getState().token;
+    return hasToken;
+  });
 
   return (
     <>

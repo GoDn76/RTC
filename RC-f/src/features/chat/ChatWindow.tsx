@@ -75,9 +75,14 @@ export function ChatWindow({ conversationId }: Props) {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-background/95 h-full relative">
+    <div className="flex-1 flex flex-col bg-transparent h-full relative overflow-hidden">
+      {/* Subtle ambient lighting for chat workspace */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div className="absolute top-[40%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-emerald-500/5 rounded-full blur-[140px] mix-blend-screen" />
+      </div>
+
       {/* Header */}
-      <div className="h-[72px] shrink-0 border-b border-white/5 glass-3d flex items-center justify-between px-6 z-20 relative">
+      <div className="h-[72px] shrink-0 border-b border-white/5 bg-background/40 backdrop-blur-xl flex items-center justify-between px-6 z-20 relative">
         <div className="flex items-center gap-3">
           <Avatar className="w-10 h-10 border border-border/50">
             <AvatarImage src={conversation.avatar} />
@@ -133,7 +138,7 @@ export function ChatWindow({ conversationId }: Props) {
       </div>
 
       {/* Message List */}
-      <div ref={scrollRef} className="flex-1 px-6 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 px-6 overflow-y-auto relative z-10">
         <div className="flex flex-col justify-end min-h-full py-6">
           {messages.length === 0 ? (
             <div className="text-center text-muted-foreground py-10 mt-auto">

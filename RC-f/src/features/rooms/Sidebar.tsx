@@ -36,8 +36,8 @@ export function Sidebar() {
     <motion.div 
       initial={false}
       animate={{ width: isSidebarCollapsed ? 72 : 320 }}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="flex flex-col glass h-full shrink-0 relative z-20 border-r border-white/5 border-y-0 border-l-0 shadow-2xl overflow-hidden"
+      transition={{ type: "spring", stiffness: 350, damping: 35 }}
+      className="flex flex-col h-full shrink-0 relative z-20 bg-[#0B0F0D]/60 dark:bg-background/60 backdrop-blur-2xl shadow-[10px_0_40px_-10px_rgba(0,0,0,0.6),inset_-1px_0_0_rgba(255,255,255,0.03)] overflow-hidden"
     >
       {/* Header section */}
       <div className="p-4 flex items-center justify-between shrink-0 h-[72px]">
@@ -85,19 +85,19 @@ export function Sidebar() {
                     key={conv.id}
                     onClick={() => navigate(`/c/${conv.id}`)}
                     className={cn(
-                      "w-full flex items-center p-2 rounded-xl text-left transition-colors relative group",
+                      "w-full flex items-center p-2 rounded-xl text-left transition-all duration-200 ease-out relative group",
                       isSidebarCollapsed ? "justify-center" : "gap-3",
                       conversationId === conv.id 
                         ? "text-foreground dark:text-white" 
-                        : "hover:text-foreground dark:hover:text-white text-muted-foreground"
+                        : "hover:text-foreground dark:hover:text-white text-muted-foreground hover:-translate-y-[1px] hover:bg-white/[0.02]"
                     )}
                     title={isSidebarCollapsed ? conv.displayName : undefined}
                   >
                     {conversationId === conv.id && (
                       <motion.div
                         layoutId="active-room"
-                        className="absolute inset-0 bg-emerald-500/10 backdrop-blur-md border border-emerald-500/20 rounded-xl z-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
-                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        className="absolute inset-0 bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 rounded-xl z-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_0_20px_rgba(16,185,129,0.15)]"
+                        transition={{ type: "spring", stiffness: 350, damping: 35 }}
                       />
                     )}
                     <div className="relative z-10 shrink-0">
@@ -163,19 +163,19 @@ export function Sidebar() {
                     key={conv.id}
                     onClick={() => navigate(`/c/${conv.id}`)}
                     className={cn(
-                      "w-full flex items-center p-2 rounded-xl text-left transition-colors relative group",
+                      "w-full flex items-center p-2 rounded-xl text-left transition-all duration-200 ease-out relative group",
                       isSidebarCollapsed ? "justify-center" : "gap-3",
                       conversationId === conv.id 
                         ? "text-foreground dark:text-white" 
-                        : "hover:text-foreground dark:hover:text-white text-muted-foreground"
+                        : "hover:text-foreground dark:hover:text-white text-muted-foreground hover:-translate-y-[1px] hover:bg-white/[0.02]"
                     )}
                     title={isSidebarCollapsed ? conv.displayName : undefined}
                   >
                     {conversationId === conv.id && (
                       <motion.div
                         layoutId="active-room"
-                        className="absolute inset-0 bg-emerald-500/10 backdrop-blur-md border border-emerald-500/20 rounded-xl z-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
-                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        className="absolute inset-0 bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 rounded-xl z-0 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_0_20px_rgba(16,185,129,0.15)]"
+                        transition={{ type: "spring", stiffness: 350, damping: 35 }}
                       />
                     )}
                     <Avatar className="w-10 h-10 border border-border/50 relative z-10 shrink-0">
