@@ -13,7 +13,7 @@ import {
 import { motion } from 'framer-motion';
 
 export function VerifyOtpPage() {
-  const { pendingVerificationEmail, pendingRegistration, clearTempEmails } = useAuthStore();
+  const { pendingVerificationEmail, pendingRegistration, clearTempEmails, setAuth } = useAuthStore();
   const navigate = useNavigate();
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,9 +41,32 @@ export function VerifyOtpPage() {
     setLoading(true);
     try {
       await authApi.verifyEmail({ email: pendingVerificationEmail!, otp });
-      toast.success('Email verified successfully! You can now log in.');
-      clearTempEmails();
-      navigate('/login');
+      
+      if (pendingRegistration && pendingRegistration.email && pendingRegistration.password) {
+        const loginData = {
+          email: pendingRegistration.email,
+          password: pendingRegistration.password,
+        };
+        const authRes = await authApi.login(loginData);
+        localStorage.setItem('chat_token', authRes.accessToken);
+        
+        const profile = await authApi.getMe();
+        const user = {
+          id: profile.uuid,
+          name: profile.name,
+          email: profile.email,
+          emailVerified: profile.emailVerified
+        };
+        setAuth(authRes.accessToken, user);
+        
+        toast.success('Registration complete! You are now logged in.');
+        clearTempEmails();
+        navigate('/');
+      } else {
+        toast.success('Email verified successfully! You can now log in.');
+        clearTempEmails();
+        navigate('/login');
+      }
     } catch (error: any) {
       toast.error(error.message || 'Verification failed');
     } finally {

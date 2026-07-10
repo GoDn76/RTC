@@ -31,18 +31,7 @@ spring:
         temp:
           use_jdbc_metadata_defaults: false # Bypass initial metadata check
 
-  mail:
-    host: smtp-relay.brevo.com
-    port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
-    from: ${SENDER_EMAIL}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
+
 
   data:
     redis:
@@ -79,3 +68,7 @@ springdoc:
     config-url: /v3/api-docs/swagger-config
     url: /v3/api-docs
     disable-swagger-default-url: true
+
+brevo:
+  api-key: ${MAIL_API_KEY}
+  from: ${SENDER_EMAIL}

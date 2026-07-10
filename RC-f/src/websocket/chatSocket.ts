@@ -16,8 +16,11 @@ class ChatSocketService {
 
   constructor() {
     // In production, this would be an environment variable
-    const host = import.meta.env.VITE_WS_HOST || window.location.host;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let host = import.meta.env.VITE_WS_HOST || window.location.host;
+    if (typeof window !== 'undefined' && host.includes('localhost')) {
+      host = host.replace('localhost', window.location.hostname);
+    }
+    const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     this.url = `${protocol}//${host}/ws/chat`;
   }
 

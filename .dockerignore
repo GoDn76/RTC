@@ -1,0 +1,17 @@
+target
+.git
+.idea
+.vscode
+*.iml
+
+logs
+*.log
+
+.env
+.env.*
+RC-f
+README.md
+Dockerfile
+docker-compose.yml
+
+.DS_Store

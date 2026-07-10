@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+import { env } from '../config/env';
+
+const API_BASE = env.apiBaseUrl;
 
 export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const token = localStorage.getItem('chat_token');
