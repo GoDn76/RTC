@@ -11,7 +11,7 @@ logs
 .env.*
 RC-f
 README.md
-Dockerfile
+OLD-Dockerfile
 docker-compose.yml
 
 .DS_Store

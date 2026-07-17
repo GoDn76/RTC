@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: rechaton-redis
+    restart: unless-stopped
+
+    command:
+      - redis-server
+      - --appendonly
+      - yes
+      - --save
+      - "60"
+      - "1000"
+
+    ports:
+      - "6379:6379"
+
+    volumes:
+      - redis_data:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+
+    container_name: rechaton-backend
+
+    restart: unless-stopped
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    ports:
+      - "8080:8080"
+
+    env_file:
+      - .env
+
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/actuator/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  redis_data:

@@ -64,10 +64,12 @@ app:
 springdoc:
   api-docs:
     path: /v3/api-docs
+    enabled: ${ENABLE_SWAGGER}
   swagger-ui:
     config-url: /v3/api-docs/swagger-config
     url: /v3/api-docs
     disable-swagger-default-url: true
+    enabled: ${ENABLE_SWAGGER}
 
 brevo:
   api-key: ${MAIL_API_KEY}

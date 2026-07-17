@@ -41,7 +41,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
-        log.info("User Connected: {}", session.getId());
         String userId = (String)session.getAttributes().get("USER_ID");
         String name = (String)session.getAttributes().get("name");
         userManager.markActive(userId, name, session);
